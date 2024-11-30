@@ -48,6 +48,11 @@ export function registerShellTools(server: Server, rootDir: string) {
         description: '環境變數',
         optional: true
       },
+      shell: {
+        type: 'string',
+        description: '指定使用的 shell',
+        optional: true
+      },
       forceInteractive: {
         type: 'boolean',
         description: '強制使用互動模式',
@@ -67,7 +72,8 @@ export function registerShellTools(server: Server, rootDir: string) {
             name: 'createInteractiveSession',
             parameters: {
               cwd: params.cwd,
-              env: params.env
+              env: params.env,
+              shell: params.shell  // 傳入指定的 shell
             }
           }
         });
@@ -107,6 +113,10 @@ export function registerShellTools(server: Server, rootDir: string) {
 
         if (params.env) {
           options.env = { ...process.env, ...params.env };
+        }
+
+        if (params.shell) {
+          options.shell = params.shell;
         }
 
         const result = shell.exec(params.command, options);
