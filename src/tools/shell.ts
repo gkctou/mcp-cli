@@ -8,7 +8,6 @@ const execAsync = promisify(exec);
 export function registerShellTools(server: Server, rootDir: string) {
   const validator = new PathValidator(rootDir);
 
-  // 工作目錄驗證 API
   server.setToolHandler({
     name: 'validateWorkingDirectory',
     description: '驗證工作目錄是否在安全範圍內',
@@ -30,7 +29,6 @@ export function registerShellTools(server: Server, rootDir: string) {
     }
   });
 
-  // Shell 命令執行 API
   server.setToolHandler({
     name: 'shell',
     description: '在指定的工作目錄中執行 Shell 命令',
@@ -42,17 +40,22 @@ export function registerShellTools(server: Server, rootDir: string) {
       cwd: {
         type: 'string',
         description: '工作目錄',
-        optional: false  // 變為必需參數
+        optional: false
       }
     }
   }, async (params) => {
     try {
-      // 驗證工作目錄
+      // 1. 驗證工作目錄
       const safeCwd = validator.validateWorkingDirectory(params.cwd);
 
-      // 執行命令
-      const { stdout, stderr } = await execAsync(params.command, {
-        cwd: safeCwd
+      // 2. 构建包含 cd 命令的完整指令
+      // 使用 cd && 確保在正確的目錄下執行命令
+      const fullCommand = `cd "${safeCwd}" && ${params.command}`;
+
+      // 3. 執行完整命令
+      const { stdout, stderr } = await execAsync(fullCommand, {
+        // 不使用 cwd 選項，因為我們已經在命令中包含了 cd
+        shell: true  // 確保可以執行 shell 命令
       });
 
       return {
