@@ -1,5 +1,5 @@
 import { homedir } from 'os';
-import { join } from 'path';
+import { join, normalize } from 'path';
 import shell from 'shelljs';
 import fs from 'fs/promises';
 
@@ -25,13 +25,13 @@ export class WhitelistManager {
   }
 
   /**
-   * 取得系統用戶的預設目錄
+   * Get system user's default directory
    */
   private async getDefaultDirectory(): Promise<string> {
     const username = process.env.USER || process.env.USERNAME;
     let defaultPath: string;
 
-    // 根據不同系統取得 Documents 目錄
+    // Get Documents directory based on different systems
     if (process.platform === 'win32') {
       // Windows
       defaultPath = join(homedir(), 'Documents');
@@ -51,9 +51,9 @@ export class WhitelistManager {
         }
       }
     } else {
-      // Linux 和其他 Unix-like 系統
+      // Linux and other Unix-like systems
       defaultPath = join(homedir(), 'Documents');
-      // 如果不存在，嘗試其他可能的名稱
+      // Try other possible names if not exists
       if (!shell.test('-d', defaultPath)) {
         defaultPath = join(homedir(), 'Desktop');
         if (!shell.test('-d', defaultPath)) {
@@ -62,18 +62,18 @@ export class WhitelistManager {
       }
     }
 
-    // 確保目錄存在且可寫入
+    // Ensure directory exists and is writable
     try {
       await fs.access(defaultPath, fs.constants.W_OK);
       return defaultPath;
     } catch {
-      // 如果無法存取或寫入，回到 home 目錄
+      // If cannot access or write, fallback to home directory
       return homedir();
     }
   }
 
   /**
-   * 確保配置目錄存在
+   * Ensure configuration directory exists
    */
   private async ensureConfigDir(): Promise<void> {
     const configDir = join(homedir(), '.mcp-shell');
@@ -85,21 +85,21 @@ export class WhitelistManager {
   }
 
   /**
-   * 讀取白名單配置
+   * Read whitelist configuration
    */
   private async readConfig(): Promise<WhitelistConfig> {
     try {
       const content = await fs.readFile(this.configPath, 'utf-8');
       return JSON.parse(content);
     } catch {
-      // 如果無法讀取或解析，則建立預設配置
+      // If cannot read or parse, create default configuration
       const defaultDir = await this.getDefaultDirectory();
       const defaultConfig: WhitelistConfig = {
         directories: [defaultDir],
         lastUpdated: new Date().toISOString()
       };
 
-      // 確保配置目錄存在並寫入預設配置
+      // Ensure config directory exists and write default configuration
       await this.ensureConfigDir();
       await fs.writeFile(this.configPath, JSON.stringify(defaultConfig, null, 2));
 
@@ -108,7 +108,7 @@ export class WhitelistManager {
   }
 
   /**
-   * 取得白名單目錄
+   * Get whitelisted directories
    */
   public async getWhitelistedDirectories(): Promise<string[]> {
     if (!this.config) {
@@ -118,24 +118,27 @@ export class WhitelistManager {
   }
 
   /**
-   * 檢查路徑是否在白名單中
+   * Check if path is in whitelist
    */
   public async isPathWhitelisted(path: string): Promise<boolean> {
     const whitelistedDirs = await this.getWhitelistedDirectories();
-    const normalizedPath = shell.pwd().toString();
+    const normalizedPath = normalize(path);
 
-    return whitelistedDirs.some(dir => normalizedPath.startsWith(dir));
+    return whitelistedDirs.some(dir => {
+      const normalizedDir = normalize(dir);
+      return normalizedPath.startsWith(normalizedDir);
+    });
   }
 
   /**
-   * 新增目錄到白名單
+   * Add directory to whitelist
    */
   public async addDirectory(path: string): Promise<void> {
     if (!this.config) {
       this.config = await this.readConfig();
     }
 
-    const normalizedPath = shell.pwd().toString();
+    const normalizedPath = normalize(path);
     if (!this.config.directories.includes(normalizedPath)) {
       this.config.directories.push(normalizedPath);
       this.config.lastUpdated = new Date().toISOString();
@@ -146,15 +149,15 @@ export class WhitelistManager {
   }
 
   /**
-   * 從白名單移除目錄
+   * Remove directory from whitelist
    */
   public async removeDirectory(path: string): Promise<void> {
     if (!this.config) {
       this.config = await this.readConfig();
     }
 
-    const normalizedPath = shell.pwd().toString();
-    this.config.directories = this.config.directories.filter(dir => dir !== normalizedPath);
+    const normalizedPath = normalize(path);
+    this.config.directories = this.config.directories.filter(dir => normalize(dir) !== normalizedPath);
     this.config.lastUpdated = new Date().toISOString();
 
     await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2));

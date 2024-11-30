@@ -1,12 +1,34 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { spawn } from 'child_process';
+import { ChildProcess, spawn, SpawnOptions } from 'child_process';
 import { PathValidator } from '../security/path-validator.js';
-import { Readable, Writable } from 'stream';
 
 interface InteractiveSession {
   id: string;
-  process: ReturnType<typeof spawn>;
+  process: ChildProcess;
   lastActivity: number;
+  outputBuffer: string;
+}
+
+interface SessionParams {
+  cwd: string;
+  shell?: string;
+  env?: Record<string, string>;
+}
+
+interface WriteParams {
+  sessionId: string;
+  input: string;
+}
+
+interface TerminateParams {
+  sessionId: string;
+}
+
+interface ToolResponse {
+  content: Array<{
+    type: string;
+    text: string;
+  }>;
 }
 
 export class InteractiveShellManager {
@@ -14,14 +36,12 @@ export class InteractiveShellManager {
 
   constructor(
     private readonly validator: PathValidator,
-    // 清理超過 30 分鐘未活動的會話
     private readonly sessionTimeout: number = 30 * 60 * 1000
   ) {
-    // 定期清理逾時會話
     setInterval(() => this.cleanupSessions(), 60 * 1000);
   }
 
-  private cleanupSessions() {
+  private cleanupSessions(): void {
     const now = Date.now();
     for (const [id, session] of this.sessions) {
       if (now - session.lastActivity > this.sessionTimeout) {
@@ -30,156 +50,201 @@ export class InteractiveShellManager {
     }
   }
 
-  private terminateSession(id: string) {
+  private terminateSession(id: string): void {
     const session = this.sessions.get(id);
     if (session) {
-      session.process.kill();
+      try {
+        session.process.kill();
+      } catch (error) {
+        console.error('Process termination failed:', error);
+      }
       this.sessions.delete(id);
     }
   }
 
-  private updateActivity(id: string) {
+  private updateActivity(id: string): void {
     const session = this.sessions.get(id);
     if (session) {
       session.lastActivity = Date.now();
     }
   }
 
-  public registerTools(server: Server) {
-    // 創建互動式會話
-    server.setToolHandler({
+  private getShellInfo(): { command: string; args: string[] } {
+    if (process.platform === 'win32') {
+      return {
+        command: 'cmd.exe',
+        args: ['/c']
+      };
+    }
+    return {
+      command: '/bin/bash',
+      args: ['-c']
+    };
+  }
+
+  private startProcess(cwd: string, env?: Record<string, string>): ChildProcess {
+    const { command, args } = this.getShellInfo();
+    const spawnOptions: SpawnOptions = {
+      cwd,
+      env: env ? { ...process.env, ...env } : process.env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true,
+      windowsHide: true
+    };
+
+    return spawn(command, args, spawnOptions);
+  }
+
+  private setupOutputCollection(session: InteractiveSession): void {
+    if (session.process.stdout) {
+      session.process.stdout.on('data', (data: Buffer) => {
+        session.outputBuffer += data.toString();
+      });
+    }
+
+    if (session.process.stderr) {
+      session.process.stderr.on('data', (data: Buffer) => {
+        session.outputBuffer += data.toString();
+      });
+    }
+
+    session.process.on('error', (error: Error) => {
+      session.outputBuffer += `Error: ${error.message}\n`;
+    });
+  }
+
+  private getAndClearOutput(session: InteractiveSession): string {
+    const output = session.outputBuffer;
+    session.outputBuffer = '';
+    return output;
+  }
+
+  public registerTools(server: any): void {
+    // Create interactive session
+    server.registerTool({
       name: 'createInteractiveSession',
-      description: '創建互動式 shell 會話',
+      description: 'Create an interactive shell session',
       parameters: {
         cwd: {
           type: 'string',
-          description: '工作目錄'
+          description: 'Working directory'
         },
         shell: {
           type: 'string',
-          description: '指定使用的 shell',
+          description: 'Specify shell to use',
           optional: true
         },
         env: {
           type: 'object',
-          description: '環境變數',
+          description: 'Environment variables',
           optional: true
         }
-      }
-    }, async (params) => {
-      try {
-        const safeCwd = this.validator.validateWorkingDirectory(params.cwd);
-        
-        // 根據平台選擇預設 shell
-        const defaultShell = process.platform === 'win32'
-          ? process.env.COMSPEC || 'cmd.exe'
-          : process.env.SHELL || '/bin/bash';
+      },
+      handler: async (params: SessionParams): Promise<ToolResponse> => {
+        try {
+          const safeCwd = await this.validator.validateWorkingDirectory(params.cwd);
+          const sessionId = Math.random().toString(36).substring(2);
+          const childProcess = this.startProcess(safeCwd, params.env);
 
-        const shell = params.shell || defaultShell;
+          const session: InteractiveSession = {
+            id: sessionId,
+            process: childProcess,
+            lastActivity: Date.now(),
+            outputBuffer: ''
+          };
 
-        // 創建子進程
-        const childProcess = spawn(shell, [], {
-          cwd: safeCwd,
-          env: { ...process.env, ...params.env },
-          stdio: ['pipe', 'pipe', 'pipe'],
-          // Windows 特別設定
-          windowsHide: true,
-          // 啟用 pseudo-terminal
-          ...(process.platform === 'win32'
-            ? { windowsVerbatimArguments: true }
-            : { detached: true })
-        });
+          this.setupOutputCollection(session);
+          this.sessions.set(sessionId, session);
 
-        const sessionId = Math.random().toString(36).substring(2);
-
-        this.sessions.set(sessionId, {
-          id: sessionId,
-          process: childProcess,
-          lastActivity: Date.now()
-        });
-
-        return {
-          type: 'text/plain',
-          text: sessionId
-        };
-      } catch (error) {
-        throw error instanceof Error
-          ? error
-          : new Error(`創建會話失敗: ${error}`);
+          return {
+            content: [{
+              type: 'text',
+              text: sessionId
+            }]
+          };
+        } catch (error) {
+          throw error instanceof Error
+            ? error
+            : new Error(`Failed to create session: ${error}`);
+        }
       }
     });
 
-    // 傳送輸入到會話
-    server.setToolHandler({
+    // Write to session
+    server.registerTool({
       name: 'writeToSession',
-      description: '傳送輸入到互動式會話',
+      description: 'Write input to interactive session',
       parameters: {
         sessionId: {
           type: 'string',
-          description: '會話 ID'
+          description: 'Session ID'
         },
         input: {
           type: 'string',
-          description: '要傳送的輸入'
+          description: 'Input to send'
         }
-      }
-    }, async (params) => {
-      const session = this.sessions.get(params.sessionId);
-      if (!session) {
-        throw new Error('會話不存在或已結束');
-      }
+      },
+      handler: async (params: WriteParams): Promise<ToolResponse> => {
+        const session = this.sessions.get(params.sessionId);
+        if (!session) {
+          throw new Error('Session not found or already terminated');
+        }
 
-      try {
-        // 更新會話活動時間
-        this.updateActivity(params.sessionId);
+        try {
+          this.updateActivity(params.sessionId);
 
-        // 確保輸入以換行結尾
-        const input = params.input.endsWith('\n')
-          ? params.input
-          : params.input + '\n';
+          const input = params.input.endsWith('\n')
+            ? params.input
+            : params.input + '\n';
 
-        // 傳送輸入
-        session.process.stdin.write(input);
+          if (!session.process.stdin) {
+            throw new Error('Cannot write to process');
+          }
 
-        // 等待並收集輸出
-        await new Promise(resolve => setTimeout(resolve, 100));
+          session.process.stdin.write(input);
+          
+          // Wait for output collection
+          await new Promise(resolve => setTimeout(resolve, 100));
+          const output = this.getAndClearOutput(session);
 
-        // 取得輸出
-        const output = session.process.stdout.read();
-        const error = session.process.stderr.read();
-
-        return {
-          type: 'text/plain',
-          text: (output || '') + (error || '')
-        };
-      } catch (error) {
-        throw error instanceof Error
-          ? error
-          : new Error(`輸入處理失敗: ${error}`);
+          return {
+            content: [{
+              type: 'text',
+              text: output || '(no output)'
+            }]
+          };
+        } catch (error) {
+          throw error instanceof Error
+            ? error
+            : new Error(`Input processing failed: ${error}`);
+        }
       }
     });
 
-    // 結束會話
-    server.setToolHandler({
+    // Terminate session
+    server.registerTool({
       name: 'terminateSession',
-      description: '結束互動式會話',
+      description: 'Terminate interactive session',
       parameters: {
         sessionId: {
           type: 'string',
-          description: '會話 ID'
+          description: 'Session ID'
         }
-      }
-    }, async (params) => {
-      try {
-        this.terminateSession(params.sessionId);
-        return {
-          type: 'text/plain',
-          text: '會話已結束'
-        };
-      } catch (error) {
-        throw error instanceof Error
-          ? error
-          : new Error(`結束會話失敗: ${error}`);
+      },
+      handler: (params: TerminateParams): ToolResponse => {
+        try {
+          this.terminateSession(params.sessionId);
+          return {
+            content: [{
+              type: 'text',
+              text: 'Session terminated'
+            }]
+          };
+        } catch (error) {
+          throw error instanceof Error
+            ? error
+            : new Error(`Failed to terminate session: ${error}`);
+        }
       }
     });
   }

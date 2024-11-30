@@ -1,36 +1,92 @@
 import { PathValidator } from '../path-validator';
+import { WhitelistManager } from '../../config/whitelist';
 import { join } from 'path';
 
+// Mock WhitelistManager
+jest.mock('../../config/whitelist', () => {
+  return {
+    WhitelistManager: {
+      getInstance: jest.fn().mockReturnValue({
+        isPathWhitelisted: jest.fn(),
+        getWhitelistedDirectories: jest.fn(),
+        addDirectory: jest.fn(),
+        removeDirectory: jest.fn()
+      })
+    }
+  };
+});
+
 describe('PathValidator', () => {
-  const rootDir = '/Users/jason/safe-root';
   let validator: PathValidator;
+  let mockWhitelistManager: jest.Mocked<WhitelistManager>;
 
   beforeEach(() => {
-    validator = new PathValidator(rootDir);
+    // Clear all mock states
+    jest.clearAllMocks();
+    
+    validator = new PathValidator();
+    mockWhitelistManager = WhitelistManager.getInstance() as jest.Mocked<WhitelistManager>;
   });
 
-  test('安全的路徑應該通過驗證', () => {
-    expect(validator.isPathSafe(join(rootDir, 'file.txt'))).toBe(true);
-    expect(validator.isPathSafe(join(rootDir, 'subdir/file.txt'))).toBe(true);
+  describe('validateWorkingDirectory', () => {
+    const testPath = '/test/path';
+
+    test('should allow whitelisted paths', async () => {
+      mockWhitelistManager.isPathWhitelisted.mockResolvedValue(true);
+
+      const result = await validator.validateWorkingDirectory(testPath);
+      expect(result).toBe(testPath);
+      expect(mockWhitelistManager.isPathWhitelisted).toHaveBeenCalledWith(testPath);
+    });
+
+    test('should reject non-whitelisted paths', async () => {
+      mockWhitelistManager.isPathWhitelisted.mockResolvedValue(false);
+
+      await expect(validator.validateWorkingDirectory(testPath))
+        .rejects
+        .toThrow();
+      expect(mockWhitelistManager.isPathWhitelisted).toHaveBeenCalledWith(testPath);
+    });
+
+    test('should handle relative paths correctly', async () => {
+      mockWhitelistManager.isPathWhitelisted.mockResolvedValue(true);
+      const relativePath = './test';
+      const absolutePath = join(process.cwd(), 'test');
+
+      const result = await validator.validateWorkingDirectory(relativePath);
+      expect(result).toBe(absolutePath);
+      expect(mockWhitelistManager.isPathWhitelisted).toHaveBeenCalledWith(absolutePath);
+    });
+
+    test('should throw error for invalid paths', async () => {
+      mockWhitelistManager.isPathWhitelisted.mockRejectedValue(new Error('Invalid path'));
+
+      await expect(validator.validateWorkingDirectory(''))
+        .rejects
+        .toThrow();
+    });
   });
 
-  test('使用相對路徑的目錄遍歷應該被檢測到', () => {
-    expect(validator.isPathSafe('../forbidden.txt')).toBe(false);
-    expect(validator.isPathSafe('subdir/../../forbidden.txt')).toBe(false);
-  });
+  describe('whitelist management', () => {
+    test('getWhitelistedDirectories should return whitelist directories', async () => {
+      const mockDirs = ['/test/dir1', '/test/dir2'];
+      mockWhitelistManager.getWhitelistedDirectories.mockResolvedValue(mockDirs);
 
-  test('使用絕對路徑的目錄遍歷應該被檢測到', () => {
-    expect(validator.isPathSafe('/etc/passwd')).toBe(false);
-    expect(validator.isPathSafe('/usr/bin/evil')).toBe(false);
-  });
+      const result = await validator.getWhitelistedDirectories();
+      expect(result).toEqual(mockDirs);
+      expect(mockWhitelistManager.getWhitelistedDirectories).toHaveBeenCalled();
+    });
 
-  test('getSafePath 應該正確處理安全路徑', () => {
-    const safePath = join(rootDir, 'file.txt');
-    expect(() => validator.getSafePath(safePath)).not.toThrow();
-  });
+    test('addToWhitelist should add directory to whitelist', async () => {
+      const testDir = '/test/dir';
+      await validator.addToWhitelist(testDir);
+      expect(mockWhitelistManager.addDirectory).toHaveBeenCalledWith(testDir);
+    });
 
-  test('getSafePath 應該拋出不安全路徑的錯誤', () => {
-    expect(() => validator.getSafePath('../forbidden.txt')).toThrow();
-    expect(() => validator.getSafePath('/etc/passwd')).toThrow();
+    test('removeFromWhitelist should remove directory from whitelist', async () => {
+      const testDir = '/test/dir';
+      await validator.removeFromWhitelist(testDir);
+      expect(mockWhitelistManager.removeDirectory).toHaveBeenCalledWith(testDir);
+    });
   });
 });

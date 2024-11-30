@@ -18,7 +18,7 @@ export class PathValidator {
         ? normalize(cwd)
         : normalize(resolve(cwd));
 
-      // Check if path is in whitelist
+      // 檢查路徑是否在白名單中
       const isWhitelisted = await this.whitelistManager.isPathWhitelisted(absoluteCwd);
       if (!isWhitelisted) {
         throw new Error(MESSAGES.formatPathError(absoluteCwd, MESSAGES.PATH_NOT_WHITELISTED));
