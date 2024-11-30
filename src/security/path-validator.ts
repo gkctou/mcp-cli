@@ -9,22 +9,38 @@ export class PathValidator {
   }
 
   /**
-   * 驗證路徑是否在允許的根目錄內
+   * 驗證路徑是否在允許的範圍內
+   * @param targetPath 目標路徑
+   * @param cwd 當前工作目錄
    */
-  public isPathSafe(targetPath: string): boolean {
+  public isPathSafe(targetPath: string, cwd?: string): boolean {
     try {
+      // 如果提供了 cwd，先驗證 cwd 是否在允許範圍內
+      let basePath = this.rootDir;
+      if (cwd) {
+        const absoluteCwd = isAbsolute(cwd) 
+          ? normalize(cwd)
+          : normalize(join(this.rootDir, cwd));
+
+        const normalizedCwd = normalize(resolve(absoluteCwd));
+        
+        if (!normalizedCwd.startsWith(this.rootDir)) {
+          return false; // 不安全的工作目錄
+        }
+        basePath = normalizedCwd;
+      }
+
       // 將目標路徑轉換為絕對路徑
       const absolutePath = isAbsolute(targetPath)
         ? normalize(targetPath)
-        : normalize(join(this.rootDir, targetPath));
+        : normalize(join(basePath, targetPath));
 
       // 標準化路徑並解析所有的 '..' 和 '.'
       const normalizedPath = normalize(resolve(absolutePath));
 
-      // 檢查標準化後的路徑是否以根目錄開頭
+      // 確保路徑在根目錄內
       return normalizedPath.startsWith(this.rootDir);
     } catch (error) {
-      // 如果路徑處理過程中出現錯誤，視為不安全
       console.error('Path validation error:', error);
       return false;
     }
@@ -32,19 +48,23 @@ export class PathValidator {
 
   /**
    * 獲取安全的絕對路徑
-   * 如果路徑不安全，拋出錯誤
+   * @param targetPath 目標路徑
+   * @param cwd 當前工作目錄
    */
-  public getSafePath(targetPath: string): string {
-    const absolutePath = isAbsolute(targetPath)
-      ? normalize(targetPath)
-      : normalize(join(this.rootDir, targetPath));
-
-    const normalizedPath = normalize(resolve(absolutePath));
-
-    if (!this.isPathSafe(normalizedPath)) {
-      throw new Error(`不安全的路徑訪問嘗試: ${targetPath}`);
+  public getSafePath(targetPath: string, cwd?: string): string {
+    const isValid = this.isPathSafe(targetPath, cwd);
+    if (!isValid) {
+      throw new Error(`不安全的路徑: ${targetPath}`);
     }
 
-    return normalizedPath;
+    let basePath = cwd ? 
+      normalize(resolve(isAbsolute(cwd) ? cwd : join(this.rootDir, cwd))) :
+      this.rootDir;
+
+    const absolutePath = isAbsolute(targetPath)
+      ? normalize(targetPath)
+      : normalize(join(basePath, targetPath));
+
+    return normalize(resolve(absolutePath));
   }
 }
