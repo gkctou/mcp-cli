@@ -2,6 +2,36 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import shell from 'shelljs';
 import os from 'os';
 
+/**
+ * 取得 Python 版本
+ */
+async function getPythonVersion(): Promise<string | null> {
+  try {
+    // 先嘗試 python3
+    let result = shell.exec('python3 --version', { silent: true });
+    if (result.code === 0) {
+      return result.stdout.trim();
+    }
+
+    // 如果沒有 python3，嘗試 python
+    result = shell.exec('python --version', { silent: true });
+    if (result.code === 0) {
+      return result.stdout.trim();
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 取得 Node.js 版本
+ */
+function getNodeVersion(): string {
+  return process.version;
+}
+
 export function registerSystemInfoTools(server: Server) {
   // 取得系統平台資訊
   server.setToolHandler({
@@ -9,13 +39,33 @@ export function registerSystemInfoTools(server: Server) {
     description: '取得當前系統平台資訊',
     parameters: {}
   }, async () => {
+    const pythonVersion = await getPythonVersion();
+
     return {
       type: 'application/json',
       text: JSON.stringify({
+        // 系統資訊
         platform: process.platform,
         arch: process.arch,
         release: os.release(),
-        type: os.type()
+        type: os.type(),
+        hostname: os.hostname(),
+        userInfo: os.userInfo(),
+        cpus: os.cpus().length,
+        totalmem: os.totalmem(),
+        freemem: os.freemem(),
+        tmpdir: os.tmpdir(),
+
+        // 程式環境資訊
+        node: {
+          version: getNodeVersion(),
+          processVersion: process.versions, // 包含 V8、libuv 等詳細版本
+          env: process.env.NODE_ENV || 'not set'
+        },
+        python: {
+          version: pythonVersion,
+          available: pythonVersion !== null
+        }
       })
     };
   });
