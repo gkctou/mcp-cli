@@ -1,0 +1,22 @@
+{
+  "name": "mcp-shell",
+  "version": "1.0.0",
+  "description": "一個簡單的 MCP Shell 伺服器實現",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc -w"
+  },
+  "keywords": ["mcp", "shell", "typescript"],
+  "author": "gkctou",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.1",
+    "typescript": "^5.3.2"
+  }
+}
