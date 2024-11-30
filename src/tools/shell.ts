@@ -16,10 +16,15 @@ export function registerShellTools(server: Server, rootDir: string) {
       path: {
         type: 'string',
         description: '要驗證的路徑'
+      },
+      cwd: {
+        type: 'string',
+        description: '當前工作目錄',
+        optional: true
       }
     }
   }, async (params) => {
-    const isValid = validator.isPathSafe(params.path);
+    const isValid = validator.isPathSafe(params.path, params.cwd);
     return {
       type: 'text/plain',
       text: isValid ? 'valid' : 'invalid'
@@ -34,11 +39,16 @@ export function registerShellTools(server: Server, rootDir: string) {
       path: {
         type: 'string',
         description: '要標準化的路徑'
+      },
+      cwd: {
+        type: 'string',
+        description: '當前工作目錄',
+        optional: true
       }
     }
   }, async (params) => {
     try {
-      const normalizedPath = validator.getSafePath(params.path);
+      const normalizedPath = validator.getSafePath(params.path, params.cwd);
       return {
         type: 'text/plain',
         text: normalizedPath
@@ -56,13 +66,28 @@ export function registerShellTools(server: Server, rootDir: string) {
       command: {
         type: 'string',
         description: '要執行的命令'
+      },
+      cwd: {
+        type: 'string',
+        description: '當前工作目錄',
+        optional: true
       }
     }
   }, async (params) => {
-    // 此處不再需要進行路徑驗證
-    // 因為 AI 應該已經使用 validatePath 或 normalizePath 進行驗證
     try {
-      const { stdout, stderr } = await execAsync(params.command);
+      // 如果提供了 cwd，先驗證其安全性
+      let workingDir = undefined;
+      if (params.cwd) {
+        if (!validator.isPathSafe(params.cwd)) {
+          throw new Error(`不安全的工作目錄: ${params.cwd}`);
+        }
+        workingDir = validator.getSafePath(params.cwd);
+      }
+
+      const { stdout, stderr } = await execAsync(params.command, {
+        cwd: workingDir
+      });
+
       return {
         type: 'text/plain',
         text: stdout || stderr
