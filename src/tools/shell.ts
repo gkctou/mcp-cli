@@ -1,6 +1,5 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import shell from 'shelljs';
-import crossEnv from 'cross-env';
 import { PathValidator } from '../security/path-validator.js';
 
 export function registerShellTools(server: Server, rootDir: string) {
@@ -23,32 +22,36 @@ export function registerShellTools(server: Server, rootDir: string) {
         type: 'object',
         description: '環境變數',
         optional: true
+      },
+      shell: {
+        type: 'string',
+        description: '指定使用的 shell',
+        optional: true
       }
     }
   }, async (params) => {
     try {
       // 驗證工作目錄
       const safeCwd = validator.validateWorkingDirectory(params.cwd);
+      
+      // 準備執行選項
+      const options: shell.ExecOptions = {
+        cwd: safeCwd,
+        silent: true
+      };
 
-      // 準備環境變數字串
-      let envString = '';
-      if (params.env) {
-        envString = Object.entries(params.env)
-          .map(([key, value]) => `${key}=${value}`)
-          .join(' ');
+      // 如果指定 shell，添加到選項
+      if (params.shell) {
+        options.shell = params.shell;
       }
 
-      // 构建完整命令
-      const cdCommand = `cd "${safeCwd}"`;
-      const fullCommand = envString 
-        ? `${cdCommand} && ${envString} ${params.command}`
-        : `${cdCommand} && ${params.command}`;
+      // 添加環境變數
+      if (params.env) {
+        options.env = { ...process.env, ...params.env };
+      }
 
-      // 使用 cross-env-shell 執行命令
-      const result = shell.exec(
-        `cross-env-shell "${fullCommand.replace(/"/g, '\\"')}"`,
-        { silent: true }
-      );
+      // 執行命令
+      const result = shell.exec(params.command, options);
 
       if (result.code !== 0) {
         throw new Error(result.stderr || result.stdout);
