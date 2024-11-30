@@ -1,5 +1,6 @@
 import { normalize, resolve, isAbsolute, join } from 'path';
 import { WhitelistManager } from '../config/whitelist.js';
+import { MESSAGES } from '../constants/messages.js';
 
 export class PathValidator {
   private readonly whitelistManager: WhitelistManager;
@@ -9,7 +10,7 @@ export class PathValidator {
   }
 
   /**
-   * 驗證工作目錄
+   * Validate working directory
    */
   public async validateWorkingDirectory(cwd: string): Promise<string> {
     try {
@@ -17,36 +18,36 @@ export class PathValidator {
         ? normalize(cwd)
         : normalize(resolve(cwd));
 
-      // 檢查路徑是否在白名單中
+      // Check if path is in whitelist
       const isWhitelisted = await this.whitelistManager.isPathWhitelisted(absoluteCwd);
       if (!isWhitelisted) {
-        throw new Error(`目錄不在白名單中: ${absoluteCwd}`);
+        throw new Error(MESSAGES.formatPathError(absoluteCwd, MESSAGES.PATH_NOT_WHITELISTED));
       }
 
       return absoluteCwd;
     } catch (error) {
       throw error instanceof Error 
         ? error 
-        : new Error(`無效的工作目錄: ${cwd}`);
+        : new Error(MESSAGES.formatPathError(cwd, MESSAGES.INVALID_WORKING_DIRECTORY));
     }
   }
 
   /**
-   * 取得白名單目錄列表
+   * Get whitelisted directories
    */
   public async getWhitelistedDirectories(): Promise<string[]> {
     return await this.whitelistManager.getWhitelistedDirectories();
   }
 
   /**
-   * 新增目錄到白名單
+   * Add directory to whitelist
    */
   public async addToWhitelist(path: string): Promise<void> {
     await this.whitelistManager.addDirectory(path);
   }
 
   /**
-   * 從白名單移除目錄
+   * Remove directory from whitelist
    */
   public async removeFromWhitelist(path: string): Promise<void> {
     await this.whitelistManager.removeDirectory(path);
