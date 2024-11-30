@@ -35,7 +35,9 @@ export function registerFileOperations(server: Server) {
         })))
       };
     } catch (error) {
-      throw error;
+      throw error instanceof Error 
+        ? error 
+        : new Error(MESSAGES.formatPathError(params.path, MESSAGES.ERROR_READING_FILE));
     }
   });
 
@@ -46,7 +48,7 @@ export function registerFileOperations(server: Server) {
     parameters: {
       path: {
         type: 'string',
-        description: 'Directory path to create'
+        description: 'Path for the new directory'
       }
     }
   }, async (params) => {
@@ -55,7 +57,7 @@ export function registerFileOperations(server: Server) {
       const result = shell.mkdir('-p', safePath);
       
       if (result.code !== 0) {
-        throw new Error(MESSAGES.ERROR_CREATING_DIRECTORY);
+        throw new Error(MESSAGES.formatPathError(safePath, result.stderr));
       }
 
       return {
@@ -74,7 +76,7 @@ export function registerFileOperations(server: Server) {
     parameters: {
       path: {
         type: 'string',
-        description: 'File path to read'
+        description: 'Path to the file'
       }
     }
   }, async (params) => {
@@ -83,7 +85,7 @@ export function registerFileOperations(server: Server) {
       const content = shell.cat(safePath);
       
       if (shell.error()) {
-        throw new Error(MESSAGES.ERROR_READING_FILE);
+        throw new Error(MESSAGES.formatPathError(safePath, MESSAGES.ERROR_READING_FILE));
       }
 
       return {
@@ -102,7 +104,7 @@ export function registerFileOperations(server: Server) {
     parameters: {
       path: {
         type: 'string',
-        description: 'File path to write'
+        description: 'Path to the file'
       },
       content: {
         type: 'string',
@@ -118,7 +120,6 @@ export function registerFileOperations(server: Server) {
     try {
       const safePath = await validator.validateWorkingDirectory(params.path);
       
-      // Ensure target directory exists
       shell.mkdir('-p', dirname(safePath));
 
       if (params.append) {
@@ -128,13 +129,13 @@ export function registerFileOperations(server: Server) {
       }
       
       if (shell.error()) {
-        throw new Error(MESSAGES.ERROR_WRITING_FILE);
+        throw new Error(MESSAGES.formatPathError(safePath, MESSAGES.ERROR_WRITING_FILE));
       }
 
       return {
         type: 'text/plain',
         text: MESSAGES.formatFileOperation(
-          params.append ? 'Content append' : 'File write', 
+          params.append ? 'Content append' : 'File write',
           safePath
         )
       };
@@ -158,7 +159,7 @@ export function registerFileOperations(server: Server) {
       },
       recursive: {
         type: 'boolean',
-        description: 'Copy directories recursively',
+        description: 'Whether to copy directories recursively',
         optional: true
       }
     }
@@ -171,7 +172,7 @@ export function registerFileOperations(server: Server) {
       const result = shell.cp(options, safeSource, safeDestination);
       
       if (result.code !== 0) {
-        throw new Error(MESSAGES.formatCommandError('copy', result.stderr));
+        throw new Error(MESSAGES.formatPathError(safeSource, result.stderr));
       }
 
       return {
@@ -205,7 +206,7 @@ export function registerFileOperations(server: Server) {
       const result = shell.mv(safeSource, safeDestination);
       
       if (result.code !== 0) {
-        throw new Error(MESSAGES.formatCommandError('move', result.stderr));
+        throw new Error(MESSAGES.formatPathError(safeSource, result.stderr));
       }
 
       return {
@@ -217,24 +218,24 @@ export function registerFileOperations(server: Server) {
     }
   });
 
-  // Remove file/directory
+  // Delete file/directory
   server.setToolHandler({
     name: 'remove',
-    description: 'Remove file or directory',
+    description: 'Delete file or directory',
     parameters: {
       path: {
         type: 'string',
-        description: 'Path to remove'
+        description: 'Path to delete'
       },
       recursive: {
         type: 'boolean',
-        description: 'Remove directories recursively',
+        description: 'Whether to delete directories recursively',
         optional: true,
         default: false
       },
       force: {
         type: 'boolean',
-        description: 'Force removal',
+        description: 'Force deletion',
         optional: true,
         default: false
       }
@@ -245,14 +246,13 @@ export function registerFileOperations(server: Server) {
       
       // Check if path exists
       if (!shell.test('-e', safePath)) {
-        throw new Error(MESSAGES.FILE_NOT_FOUND);
+        throw new Error(MESSAGES.PATH_NOT_FOUND);
       }
 
       // Check if it's a directory
       const isDirectory = shell.test('-d', safePath);
       
       if (isDirectory) {
-        // If it's a directory
         if (!params.recursive) {
           // Check if directory is empty
           const contents = shell.ls(safePath);
@@ -260,25 +260,24 @@ export function registerFileOperations(server: Server) {
             throw new Error(MESSAGES.DIRECTORY_NOT_EMPTY);
           }
           
-          // Remove empty directory
+          // Delete empty directory
           const result = shell.rm('-d', safePath);
           if (result.code !== 0) {
-            throw new Error(MESSAGES.ERROR_DELETING_FILE);
+            throw new Error(MESSAGES.formatPathError(safePath, result.stderr));
           }
         } else {
-          // Recursively remove directory and its contents
-          let options = '-r';
-          if (params.force) options += 'f';
-          
-          // List all files to be deleted
+          // List files to be deleted first
           const filesToDelete = shell.find(safePath);
           
-          const result = shell.rm(options, safePath);
+          // Recursive delete
+          let options = 'r';
+          if (params.force) options += 'f';
+          
+          const result = shell.rm(`-${options}`, safePath);
           if (result.code !== 0) {
-            throw new Error(MESSAGES.ERROR_DELETING_FILE);
+            throw new Error(MESSAGES.formatPathError(safePath, result.stderr));
           }
 
-          // Return list of deleted files
           return {
             type: 'application/json',
             text: JSON.stringify({
@@ -291,13 +290,13 @@ export function registerFileOperations(server: Server) {
           };
         }
       } else {
-        // If it's a file
+        // Delete file
         let options = '';
-        if (params.force) options = '-f';
+        if (params.force) options = 'f';
         
-        const result = shell.rm(options, safePath);
+        const result = shell.rm(`-${options}`, safePath);
         if (result.code !== 0) {
-          throw new Error(MESSAGES.ERROR_DELETING_FILE);
+          throw new Error(MESSAGES.formatPathError(safePath, result.stderr));
         }
       }
 
@@ -307,6 +306,43 @@ export function registerFileOperations(server: Server) {
           status: MESSAGES.SUCCESS,
           path: safePath,
           type: isDirectory ? 'directory' : 'file'
+        })
+      };
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  // Get file/directory info
+  server.setToolHandler({
+    name: 'stat',
+    description: 'Get file or directory information',
+    parameters: {
+      path: {
+        type: 'string',
+        description: 'Path to check'
+      }
+    }
+  }, async (params) => {
+    try {
+      const safePath = await validator.validateWorkingDirectory(params.path);
+      const stats = shell.test('-e', safePath) ? shell.ls('-ld', safePath)[0] : null;
+
+      if (!stats) {
+        throw new Error(MESSAGES.PATH_NOT_FOUND);
+      }
+
+      return {
+        type: 'application/json',
+        text: JSON.stringify({
+          name: basename(safePath),
+          size: stats.size,
+          isDirectory: stats.isDirectory(),
+          isFile: stats.isFile(),
+          isSymlink: stats.isSymbolicLink(),
+          mode: stats.mode,
+          mtime: stats.mtime,
+          exists: true
         })
       };
     } catch (error) {
