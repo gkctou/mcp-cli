@@ -1,33 +1,10 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import shell from 'shelljs';
+import crossEnv from 'cross-env';
 import { PathValidator } from '../security/path-validator.js';
-
-const execAsync = promisify(exec);
 
 export function registerShellTools(server: Server, rootDir: string) {
   const validator = new PathValidator(rootDir);
-
-  server.setToolHandler({
-    name: 'validateWorkingDirectory',
-    description: '驗證工作目錄是否在安全範圍內',
-    parameters: {
-      path: {
-        type: 'string',
-        description: '要驗證的工作目錄路徑'
-      }
-    }
-  }, async (params) => {
-    try {
-      const safeCwd = validator.validateWorkingDirectory(params.path);
-      return {
-        type: 'text/plain',
-        text: safeCwd
-      };
-    } catch (error) {
-      throw error;
-    }
-  });
 
   server.setToolHandler({
     name: 'shell',
@@ -41,26 +18,45 @@ export function registerShellTools(server: Server, rootDir: string) {
         type: 'string',
         description: '工作目錄',
         optional: false
+      },
+      env: {
+        type: 'object',
+        description: '環境變數',
+        optional: true
       }
     }
   }, async (params) => {
     try {
-      // 1. 驗證工作目錄
+      // 驗證工作目錄
       const safeCwd = validator.validateWorkingDirectory(params.cwd);
 
-      // 2. 构建包含 cd 命令的完整指令
-      // 使用 cd && 確保在正確的目錄下執行命令
-      const fullCommand = `cd "${safeCwd}" && ${params.command}`;
+      // 準備環境變數字串
+      let envString = '';
+      if (params.env) {
+        envString = Object.entries(params.env)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(' ');
+      }
 
-      // 3. 執行完整命令
-      const { stdout, stderr } = await execAsync(fullCommand, {
-        // 不使用 cwd 選項，因為我們已經在命令中包含了 cd
-        shell: true  // 確保可以執行 shell 命令
-      });
+      // 构建完整命令
+      const cdCommand = `cd "${safeCwd}"`;
+      const fullCommand = envString 
+        ? `${cdCommand} && ${envString} ${params.command}`
+        : `${cdCommand} && ${params.command}`;
+
+      // 使用 cross-env-shell 執行命令
+      const result = shell.exec(
+        `cross-env-shell "${fullCommand.replace(/"/g, '\\"')}"`,
+        { silent: true }
+      );
+
+      if (result.code !== 0) {
+        throw new Error(result.stderr || result.stdout);
+      }
 
       return {
         type: 'text/plain',
-        text: stdout || stderr
+        text: result.stdout
       };
     } catch (error) {
       throw error instanceof Error 
