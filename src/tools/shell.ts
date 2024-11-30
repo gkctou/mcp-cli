@@ -8,60 +8,32 @@ const execAsync = promisify(exec);
 export function registerShellTools(server: Server, rootDir: string) {
   const validator = new PathValidator(rootDir);
 
-  // 路徑驗證 API
+  // 工作目錄驗證 API
   server.setToolHandler({
-    name: 'validatePath',
-    description: '驗證路徑是否安全可用',
+    name: 'validateWorkingDirectory',
+    description: '驗證工作目錄是否在安全範圍內',
     parameters: {
       path: {
         type: 'string',
-        description: '要驗證的路徑'
-      },
-      cwd: {
-        type: 'string',
-        description: '當前工作目錄',
-        optional: true
-      }
-    }
-  }, async (params) => {
-    const isValid = validator.isPathSafe(params.path, params.cwd);
-    return {
-      type: 'text/plain',
-      text: isValid ? 'valid' : 'invalid'
-    };
-  });
-
-  // 取得標準化路徑 API
-  server.setToolHandler({
-    name: 'normalizePath',
-    description: '取得標準化且安全的路徑',
-    parameters: {
-      path: {
-        type: 'string',
-        description: '要標準化的路徑'
-      },
-      cwd: {
-        type: 'string',
-        description: '當前工作目錄',
-        optional: true
+        description: '要驗證的工作目錄路徑'
       }
     }
   }, async (params) => {
     try {
-      const normalizedPath = validator.getSafePath(params.path, params.cwd);
+      const safeCwd = validator.validateWorkingDirectory(params.path);
       return {
         type: 'text/plain',
-        text: normalizedPath
+        text: safeCwd
       };
     } catch (error) {
-      throw new Error(`不安全的路徑: ${params.path}`);
+      throw error;
     }
   });
 
   // Shell 命令執行 API
   server.setToolHandler({
     name: 'shell',
-    description: '執行 Shell 命令',
+    description: '在指定的工作目錄中執行 Shell 命令',
     parameters: {
       command: {
         type: 'string',
@@ -69,23 +41,18 @@ export function registerShellTools(server: Server, rootDir: string) {
       },
       cwd: {
         type: 'string',
-        description: '當前工作目錄',
-        optional: true
+        description: '工作目錄',
+        optional: false  // 變為必需參數
       }
     }
   }, async (params) => {
     try {
-      // 如果提供了 cwd，先驗證其安全性
-      let workingDir = undefined;
-      if (params.cwd) {
-        if (!validator.isPathSafe(params.cwd)) {
-          throw new Error(`不安全的工作目錄: ${params.cwd}`);
-        }
-        workingDir = validator.getSafePath(params.cwd);
-      }
+      // 驗證工作目錄
+      const safeCwd = validator.validateWorkingDirectory(params.cwd);
 
+      // 執行命令
       const { stdout, stderr } = await execAsync(params.command, {
-        cwd: workingDir
+        cwd: safeCwd
       });
 
       return {
@@ -93,7 +60,9 @@ export function registerShellTools(server: Server, rootDir: string) {
         text: stdout || stderr
       };
     } catch (error) {
-      throw new Error(`命令執行失敗: ${error.message}`);
+      throw error instanceof Error 
+        ? error 
+        : new Error(`命令執行失敗: ${error}`);
     }
   });
 }
