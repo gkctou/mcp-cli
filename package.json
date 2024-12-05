@@ -1,7 +1,7 @@
 {
   "name": "mcp-cli",
   "version": "1.0.0",
-  "description": "一個簡單的 MCP Shell 伺服器實現",
+  "description": "一個安全的 MCP CLI 伺服器實現",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -9,12 +9,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "postbuild": "chmod -R a+rwx dist/index.js",
+    "postbuild": "chmod +x dist/index.js",
     "start": "node dist/index.js",
-    "dev": "tsc -w",
-    "prepublish": "npm run build",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "pub": "npm version patch && npm publish --access public" 
   },
   "keywords": [
     "mcp",
