@@ -22,7 +22,13 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "cli": {
       "command": "npx",
-      "args": ["-y", "mcp-cli", "/path/to/allowed/directory", "/path/to/allowed/directory2", ...]
+      "args": [
+        "-y", 
+        "mcp-cli", 
+        "/path/to/allowed/directory", 
+        "/path/to/allowed/directory2", 
+        ...
+        ]
     }
   }
 }
