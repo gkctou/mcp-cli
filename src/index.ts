@@ -12,8 +12,8 @@ async function main() {
   }
 
   const { server } = createServer(allowedPaths);
-  console.log("MCP Shell server started");
-  console.log("Allowed paths:", allowedPaths);
+  // console.log("MCP Shell server started");
+  // console.log("Allowed paths:", allowedPaths);
 
   await server.connect(transport);
 
