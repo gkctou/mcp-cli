@@ -1,6 +1,6 @@
 {
   "name": "mcp-cli",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A secure MCP CLI server implementation with comprehensive path whitelist validation, providing controlled file system operations and command execution in a protected environment. Features include strict security measures, real-time path validation, secure command execution, and comprehensive error handling to prevent unauthorized access and system data corruption.",
   "type": "module",
   "main": "dist/index.js",
