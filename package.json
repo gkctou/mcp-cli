@@ -1,6 +1,6 @@
 {
   "name": "mcp-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "一個安全的 MCP CLI 伺服器實現",
   "type": "module",
   "main": "dist/index.js",
