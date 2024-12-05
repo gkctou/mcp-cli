@@ -43,4 +43,5 @@ whitelist.json
 
 # Documentation
 docs/
-*.md
+# 保留 README 相關檔案
+!README*.md
