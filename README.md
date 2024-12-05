@@ -3,7 +3,13 @@
 [![NPM Version](https://img.shields.io/npm/v/mcp-shell.svg)](https://www.npmjs.com/package/mcp-shell)
 [![License](https://img.shields.io/npm/l/mcp-shell.svg)](https://github.com/gkctou/mcp-shell/blob/main/LICENSE)
 
-A Node.js implementation of the Model Context Protocol (MCP) server that provides secure file system operations and command execution capabilities. This server implements a comprehensive path whitelist validation mechanism, checking whether the working path or target path is within the specified whitelist before each file operation or command execution, ensuring that other data in your system won't be accidentally damaged.
+A secure Node.js implementation of the Model Context Protocol (MCP) that provides controlled file system operations and command execution capabilities. This server implements a comprehensive path whitelist validation mechanism as its core security feature, meticulously validating whether the working path or target path is within the specified whitelist before each file operation or command execution. This strict validation ensures that operations are confined to designated safe directories, preventing accidental or malicious access to sensitive system data.
+
+Key Security Features:
+- Path Whitelist Validation: Every file and directory operation is validated against a predefined whitelist
+- Secure Command Execution: All shell commands are executed in a controlled environment with strict directory restrictions
+- Access Control: Prevents unauthorized access to system files and directories outside the whitelist
+- Error Prevention: Comprehensive error handling to prevent system data corruption
 
 [English](./README.md) | [繁體中文](./README-zhTW.md) | [日本語](./README-jaJP.md) | [한국어](./README-koKR.md) | [Español](./README-esES.md) | [Français](./README-frFR.md) | [Deutsch](./README-deDE.md) | [Italiano](./README-itIT.md)
 
@@ -22,84 +28,149 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-## Features
+## Security Features
 
 ### Path Security
-- Strict path whitelist mechanism
-- Path validation before each operation
-- Ensures all operations are within allowed directories
-- Supports relative and absolute paths
-- Prevents directory traversal attacks
-- Protects other system data from accidental modification
+- Strict path whitelist validation mechanism
+  - Every path operation is validated against the whitelist
+  - Prevents directory traversal attacks
+  - Blocks access to sensitive system directories
+  - Validates both absolute and relative paths
+- Real-time path validation
+  - Pre-execution validation for all operations
+  - Continuous monitoring of path boundaries
+  - Prevention of path manipulation attempts
+- Access control enforcement
+  - Strict directory permissions
+  - Prevention of unauthorized access
+  - Protection against privilege escalation
 
-### File Operations
-- Read file content (requires path whitelist validation)
-- Write file (requires path whitelist validation)
-- Copy file (both source and target paths require whitelist validation)
-- Move file (both source and target paths require whitelist validation)
-- Delete file (requires path whitelist validation)
+### Command Execution Security
+- Controlled execution environment
+  - Commands run in isolated contexts
+  - Working directory restrictions
+  - Environment variable sanitization
+- Command validation
+  - Pre-execution security checks
+  - Parameter sanitization
+  - Output handling security
+- Resource usage controls
+  - Process isolation
+  - Resource limitation
+  - Execution timeout management
+
+## File System Operations
+
+### Secure File Operations
+- Read file content (with whitelist validation)
+  - Content access control
+  - Binary file handling
+  - Stream-based reading for large files
+- Write file (with whitelist validation)
+  - Atomic write operations
+  - Backup creation
+  - Permission preservation
+- Copy file (source and target path validation)
+  - Secure copy mechanisms
+  - Metadata preservation
+  - Error recovery
+- Move file (source and target path validation)
+  - Atomic move operations
+  - Cross-device support
+  - Permission handling
+- Delete file (with whitelist validation)
+  - Secure deletion
+  - Resource cleanup
+  - Deletion verification
 
 ### Directory Operations
-- Create directory (requires path whitelist validation)
-- Remove directory (requires path whitelist validation)
-- List directory contents (requires path whitelist validation)
+- Create directory (with whitelist validation)
+  - Permission structure setup
+  - Parent directory validation
+  - Recursive creation support
+- Remove directory (with whitelist validation)
+  - Safe recursive deletion
+  - Resource cleanup
+  - Permission verification
+- List directory contents (with whitelist validation)
+  - Content filtering
+  - Permission-based listing
+  - Metadata inclusion
 
-### Command Execution
-- Secure shell command execution
-- Working directory must be within whitelist
-- Environment variable support
-- Cross-platform compatibility using cross-env
+## System Integration
 
-### System Information
-- Node.js runtime information
-- Python version information
-- Operating system details
-- Shell environment information
-- CPU and memory usage status
+### Environment Management
+- Node.js runtime integration
+- Python version compatibility
+- Shell environment configuration
+- Cross-platform support
+  - Windows compatibility
+  - Unix-like systems support
+  - Path normalization
+
+### Resource Monitoring
+- CPU usage tracking
+- Memory allocation monitoring
+- Disk space management
+- Process monitoring
+  - Active process tracking
+  - Resource limitation
+  - Performance optimization
 
 ## Available Tools
 
-The server provides the following tools:
+The server provides a comprehensive set of secure tools:
 
-- validatePath: Validate if a path is within allowed whitelist directories
-- executeCommand: Execute shell commands within whitelist directories
-- readFile: Read file content from whitelist directories
-- writeFile: Write file to whitelist directories
-- copyFile: Copy files within whitelist directories
-- moveFile: Move files within whitelist directories
-- deleteFile: Delete files from whitelist directories
-- createDirectory: Create new directory in whitelist directories
-- removeDirectory: Remove directory from whitelist directories
-- listDirectory: List contents of whitelist directories
-- getSystemInfo: Get system information
-
-## Security Features
-
-- Path Whitelist Mechanism
-  - Specify allowed directories at startup
-  - All file and directory operations require whitelist validation
-  - Prevents modification of critical system files
-  - Restricts operations to safe directories
-- Command Execution Security
-  - Working directory restricted to whitelist
-  - Commands executed in controlled environment
-- Comprehensive error handling
+- validatePath: Validates path against whitelist with detailed security checks
+- executeCommand: Executes shell commands in a secure, controlled environment
+- readFile: Securely reads file content with access control
+- writeFile: Performs secure file writing with atomic operations
+- copyFile: Implements secure file copying with integrity checks
+- moveFile: Executes secure file moving with transaction support
+- deleteFile: Performs secure file deletion with verification
+- createDirectory: Creates directories with proper security controls
+- removeDirectory: Safely removes directories with resource cleanup
+- listDirectory: Lists directory contents with security filtering
+- getSystemInfo: Retrieves system information securely
 
 ## Error Handling
 
-The server includes comprehensive error handling:
+Comprehensive error handling system:
 
-- Path whitelist validation errors
-- File not found errors
-- Directory not found errors
+- Path validation errors
+  - Invalid path detection
+  - Whitelist violation alerts
+  - Path manipulation attempts
+- File operation errors
+  - Access denied handling
+  - Resource unavailable
+  - Corruption prevention
 - Command execution errors
-- System information retrieval errors
+  - Execution failure handling
+  - Resource exhaustion
+  - Security violation detection
+- System information errors
+  - Data collection failures
+  - Resource access issues
+  - Permission problems
 
 ## Implementation Details
 
-The server is built using:
+Built with enterprise-grade security:
 
 - Model Context Protocol SDK
-- shelljs for file system operations
-- cross-env for cross-platform environment variables
-- Zod for data validation
+  - Secure communication
+  - Protocol validation
+  - Data integrity checks
+- shelljs for secure file system operations
+  - Command sanitization
+  - Path validation
+  - Error handling
+- cross-env for secure cross-platform support
+  - Environment isolation
+  - Variable sanitization
+  - Platform compatibility
+- Zod for strict data validation
+  - Schema enforcement
+  - Type safety
+  - Input sanitization

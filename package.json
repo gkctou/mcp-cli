@@ -1,7 +1,7 @@
 {
   "name": "mcp-cli",
-  "version": "1.0.1",
-  "description": "一個安全的 MCP CLI 伺服器實現",
+  "version": "1.0.0",
+  "description": "A secure MCP CLI server implementation with comprehensive path whitelist validation, providing controlled file system operations and command execution in a protected environment. Features include strict security measures, real-time path validation, secure command execution, and comprehensive error handling to prevent unauthorized access and system data corruption.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,7 +21,13 @@
   "keywords": [
     "mcp",
     "cli",
-    "typescript"
+    "typescript",
+    "security",
+    "whitelist",
+    "path-validation",
+    "secure-execution",
+    "file-operations",
+    "command-control"
   ],
   "author": "gkctou",
   "license": "MIT",
