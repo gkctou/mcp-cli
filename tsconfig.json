@@ -3,8 +3,10 @@
     "target": "ES2020",
     "module": "ES2020",
     "moduleResolution": "node",
+    "resolveJsonModule": true,
     "esModuleInterop": true,
     "outDir": "./dist",
+    // "outFile": "./dist/index.js",
     "rootDir": "./src",
     "strict": true
   },

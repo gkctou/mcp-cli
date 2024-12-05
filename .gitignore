@@ -1,15 +1,24 @@
 # Dependencies
 node_modules/
 package-lock.json
+example/
 
 # Build output
 dist/
 build/
+lib/
+out/
+*.js
+*.js.map
+*.d.ts
 
 # Environment variables
 .env
 .env.local
 .env.*.local
+.env.development
+.env.test
+.env.production
 
 # Logs
 logs/
@@ -17,20 +26,63 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-.DS_Store
+*.swn
+*.bak
+*.sublime*
+.project
+.settings/
+.classpath
+.factorypath
+
+# Editor directories and files
+.vim/
+*.vim
+*~
 
 # Test coverage
 coverage/
+.nyc_output/
+junit.xml
+test-report.xml
 
 # TypeScript
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Project specific
 .mcp-shell/
 whitelist.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.temp/
+
+# Debug
+.debug/
+debug/
+.debug.log
+
+# Misc
+.history/
+.git/
+*.pid
+*.seed
+*.pid.lock

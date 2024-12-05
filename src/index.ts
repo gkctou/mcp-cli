@@ -1,45 +1,31 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { registerShellTools } from './tools/shell.js';
-import { registerFileOperations } from './tools/file-operations.js';
-import { registerFileSearch } from './tools/file-search.js';
-import { registerSystemInfoTools } from './tools/system-info.js';
+#!/usr/bin/env node
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createServer } from "./server.js";
 
-export async function startServer() {
-  try {
-    // 創建伺服器實例
-    const server = new Server({
-      name: 'mcp-shell',
-      version: '1.0.0'
-    }, {
-      capabilities: {
-        tools: {}
-      }
-    });
+async function main() {
+  const transport = new StdioServerTransport();
 
-    // 取得根目錄
-    const rootDir = process.env.MCP_SHELL_ROOT || process.cwd();
-
-    // 註冊所有工具
-    registerSystemInfoTools(server);
-    registerShellTools(server, rootDir);
-    registerFileOperations(server, rootDir);
-    registerFileSearch(server, rootDir);
-
-    // 創建 stdio 傳輸層
-    const transport = new StdioServerTransport();
-
-    // 啟動伺服器
-    await server.connect(transport);
-
-    console.error('MCP Shell Server started');
-  } catch (error) {
-    console.error('Failed to start MCP Shell Server:', error);
+  const allowedPaths = process.argv.slice(2);
+  if (allowedPaths.length === 0) {
+    console.error("Error: At least one allowed path must be provided");
     process.exit(1);
   }
+
+  const { server } = createServer(allowedPaths);
+  console.log("MCP Shell server started");
+  console.log("Allowed paths:", allowedPaths);
+
+  await server.connect(transport);
+
+  // Cleanup on exit
+  process.on("SIGINT", async () => {
+    // await cleanup();
+    await server.close();
+    process.exit(0);
+  });
 }
 
-// 當直接執行時啟動伺服器
-if (import.meta.url === `file://${process.argv[1]}`) {
-  startServer();
-}
+main().catch((error) => {
+  console.error("Server error:", error);
+  process.exit(1);
+});
