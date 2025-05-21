@@ -14,7 +14,6 @@
   ],
   "scripts": {
     "build": "tsc",
-    "postbuild": "chmod +x dist/index.js",
     "start": "node dist/index.js",
     "pub": "npm version patch && npm publish --access public"
   },

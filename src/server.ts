@@ -35,10 +35,35 @@ const getDetailedSystemInfo = () => {
     freeMemory: os.freemem(),
   };
 
-  const shellInfo = {
-    type: shell.exec("echo $SHELL", { silent: true }).stdout.trim(),
-    version: shell.exec("$SHELL --version", { silent: true }).stdout.trim(),
+  let shellInfo = {
+    type: "Unknown",
+    version: "N/A",
   };
+
+  if (process.platform === "win32") {
+    // Try to get cmd.exe version
+    const cmdVersionResult = shell.exec("cmd.exe /c ver", { silent: true });
+    if (cmdVersionResult.code === 0 && cmdVersionResult.stdout.trim()) {
+      shellInfo.type = "cmd.exe";
+      shellInfo.version = cmdVersionResult.stdout.trim();
+    } else {
+      // Try to get PowerShell version
+      const psVersionResult = shell.exec("powershell -Command \"$PSVersionTable.PSVersion.ToString()\"", { silent: true });
+      if (psVersionResult.code === 0 && psVersionResult.stdout.trim()) {
+        shellInfo.type = "PowerShell";
+        shellInfo.version = psVersionResult.stdout.trim();
+      }
+    }
+  } else {
+    const shellPath = shell.exec("echo $SHELL", { silent: true }).stdout.trim();
+    if (shellPath) {
+      shellInfo.type = shellPath;
+      const shellVersionResult = shell.exec(`${shellPath} --version`, { silent: true });
+      if (shellVersionResult.code === 0 && shellVersionResult.stdout.trim()) {
+        shellInfo.version = shellVersionResult.stdout.trim().split('\n')[0]; // Take the first line for version
+      }
+    }
+  }
 
   return {
     runtimes: {
@@ -318,6 +343,16 @@ export const createServer = (allowedPaths: string[]) => {
   });
 
   // Handle tool call request
+  // Helper function to quote arguments if necessary, especially for Windows compatibility
+  const quoteArgIfNeeded = (arg: string): string => {
+    // Check if quoting is needed: contains space and not already quoted
+    if (arg.includes(' ') && !(arg.startsWith('"') && arg.endsWith('"'))) {
+      // Escape inner quotes by doubling them (for cmd.exe), then wrap in quotes
+      return `"${arg.replace(/"/g, '""')}"`;
+    }
+    return arg; // Return as is if no quoting needed
+  };
+
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
@@ -335,6 +370,11 @@ export const createServer = (allowedPaths: string[]) => {
         );
       }
 
+      // IMPORTANT FOR WINDOWS COMPATIBILITY:
+      // Thoroughly test command execution on a Windows environment,
+      // especially with commands, paths, and arguments containing spaces.
+      // While quoting has been implemented, Windows shell (cmd.exe) behavior
+      // can have subtleties.
       if (name === ToolName.EXECUTE_COMMAND) {
         const validatedArgs = ExecuteCommandSchema.parse(args);
         const { workingDirectory, command, args: commandArgs = [], env = {} } = validatedArgs;
@@ -351,7 +391,10 @@ export const createServer = (allowedPaths: string[]) => {
 
         // Build command with environment variables using cross-env
         const envCommand = buildEnvCommand(env);
-        const fullCommand = `cd "${workingDirValidation.absolutePath}" && ${envCommand} ${command} ${commandArgs.join(" ")}`;
+        // Process arguments for safe execution
+        const processedCommandArgs = commandArgs.map(quoteArgIfNeeded).join(" ");
+        // The command variable itself is enclosed in double quotes as per instruction.
+        const fullCommand = `cd "${workingDirValidation.absolutePath}" && ${envCommand} "${command}" ${processedCommandArgs}`;
 
         // Execute command
         const result = shell.exec(fullCommand, { silent: true });
